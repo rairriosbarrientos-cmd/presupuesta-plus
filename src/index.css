@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { margin: 0; padding: 0; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background: #EDF1F4; color: #0C1B2A; font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
+button { cursor: pointer; }
+.nums { font-variant-numeric: tabular-nums; }
+
+/* ---------- Impresión / PDF ---------- */
+.solo-print { display: none; }
+@page { size: letter; margin: 12mm 11mm 14mm; }
+@media print {
+  body { background: #fff !important; }
+  .no-print { display: none !important; }
+  .solo-print { display: block !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .break-inside-avoid, tr, img { break-inside: avoid; }
+  .salto-pagina { break-before: page; }
+  thead { display: table-header-group; }
+  .header-app { display: none !important; }
+}
+
+/* ---------- Tablas de reporte ---------- */
+.tabla-reporte { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.tabla-reporte thead th { background: #0C1B2A !important; color: #fff !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 9.5px; padding: 6px 6px !important; text-align: left; white-space: nowrap; }
+.tabla-reporte tbody td { padding: 5px 6px !important; border-bottom: 1px solid #E3E8EC; vertical-align: top; }
+.tabla-reporte tbody tr:nth-child(even) td { background: #F6F8FA; }
+.tabla-reporte .num { text-align: right; font-family: 'JetBrains Mono', ui-monospace, monospace; white-space: nowrap; }
+.tabla-reporte tfoot td { padding: 6px !important; font-weight: 700; border-top: 2px solid #0C1B2A; background: #E8F7F2; }
+.titulo-seccion { font-family: 'Sora', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 17px; color: #0C1B2A; margin: 18px 0 8px; padding-left: 10px; border-left: 4px solid #00A67E; }
+@media print { .app-raiz { background: #fff !important; min-height: 0 !important; } }
