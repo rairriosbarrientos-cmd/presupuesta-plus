@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Plus, Trash2, Pencil, FileText, Calculator, Tag, MapPin, TrendingUp, TrendingDown, Send, RefreshCw,
-  Printer, CircleCheck, Ban, Undo2, Copy, ChevronRight, Layers, Building2, Download, Search,
+  Printer, CircleCheck, Ban, Undo2, Copy, ChevronRight, Layers, Building2, Download, Search, Upload,
 } from 'lucide-react';
 import {
   COLORS, FONT_SLAB, FONT_SANS, FONT_MONO, CARD_SHADOW, Sheet, Field, TextInput, Select, PrimaryButton,
@@ -11,9 +11,11 @@ import {
 } from './ui.jsx';
 import { Logo, NombreMarca } from './Marca.jsx';
 import { aplicarCambios } from './nube/fusion.js';
+import { MI_EMPRESA_ID, MiEmpresaSheet, abrirWhatsApp, BotonWhatsApp } from './MiEmpresa.jsx';
 import {
   CATALOGO_ID, CATEGORIAS_INSUMO, esCotizacion, normalizarCatalogo, precioVigente, variacionPrecio, costoDirectoConcepto,
   calcularEjecucion, explosionInsumos, totalCotizacion, congelar, siguienteFolio, vence, isoDe, csvPresupuesto,
+  importarInsumos, PLANTILLA_INSUMOS,
 } from './cotizaciones/calculo.js';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -69,6 +71,8 @@ export default function App({ nube, cuenta }) {
   useEffect(() => { if (cargado) nube.actualizar(registros); }, [registros, cargado, nube]);
 
   const guardado = registros.find((r) => r.id === CATALOGO_ID);
+  const miEmpresa = registros.find((r) => r.id === MI_EMPRESA_ID);
+  const [verEmpresa, setVerEmpresa] = useState(false);
   const catalogo = useMemo(() => normalizarCatalogo(guardado), [guardado]);
   const presupuestos = registros.filter(esCotizacion);
   const guardar = (r) => setRegistros((prev) => (prev.some((p) => p.id === r.id) ? prev.map((p) => (p.id === r.id ? r : p)) : [...prev, r]));
@@ -81,17 +85,17 @@ export default function App({ nube, cuenta }) {
   if (vista.tipo === 'catalogo') {
     pantalla = <CatalogoView catalogo={catalogo} onGuardar={guardar} onBack={() => setVista({ tipo: 'lista' })} />;
   } else if (vista.tipo === 'pdf' && actual) {
-    pantalla = <CotizacionPDF cotizacion={actual} catalogo={catalogo} cuenta={cuenta} onBack={() => setVista({ tipo: 'editar', id: actual.id })} />;
+    pantalla = <CotizacionPDF cotizacion={actual} catalogo={catalogo} cuenta={cuenta} marca={miEmpresa} onMarca={() => setVerEmpresa(true)} onBack={() => setVista({ tipo: 'editar', id: actual.id })} />;
   } else if (vista.tipo === 'editar' && actual) {
     pantalla = (
-      <EditorPresupuesto cotizacion={actual} catalogo={catalogo} onGuardar={guardar} onBack={() => setVista({ tipo: 'lista' })} onPDF={() => setVista({ tipo: 'pdf', id: actual.id })}
+      <EditorPresupuesto cotizacion={actual} catalogo={catalogo} firma={miEmpresa?.nombre || cuenta?.empresa} onGuardar={guardar} onBack={() => setVista({ tipo: 'lista' })} onPDF={() => setVista({ tipo: 'pdf', id: actual.id })}
         onIrCatalogo={() => setVista({ tipo: 'catalogo' })}
         onBorrar={() => { borrar(actual.id); setVista({ tipo: 'lista' }); }}
         onDuplicar={() => { const copia = { ...actual, id: uid(), folio: siguienteFolio(registros), estado: 'borrador', fecha: hoy(), congelado: null }; guardar(copia); setVista({ tipo: 'editar', id: copia.id }); }} />
     );
   } else {
     pantalla = (
-      <Inicio presupuestos={presupuestos} catalogo={catalogo} cuenta={cuenta}
+      <Inicio presupuestos={presupuestos} catalogo={catalogo} cuenta={cuenta} miEmpresa={miEmpresa} onEmpresa={() => setVerEmpresa(true)}
         onAbrir={(id) => setVista({ tipo: 'editar', id })} onCatalogo={() => setVista({ tipo: 'catalogo' })}
         onNuevo={() => { const c = nuevoPresupuesto(registros); guardar(c); setVista({ tipo: 'editar', id: c.id }); }} />
     );
@@ -100,6 +104,7 @@ export default function App({ nube, cuenta }) {
     <div className="min-h-screen app-raiz" style={{ background: COLORS.bg, fontFamily: FONT_SANS }}>
       <ChipCuenta cuenta={cuenta} sync={sync} />
       <div className="max-w-3xl mx-auto">{pantalla}</div>
+      {verEmpresa && <MiEmpresaSheet datos={miEmpresa} empresa={cuenta?.empresa} onClose={() => setVerEmpresa(false)} onGuardar={(d) => { guardar(d); setVerEmpresa(false); }} />}
     </div>
   );
 }
@@ -124,7 +129,7 @@ function ChipCuenta({ cuenta, sync }) {
 
 const FILTROS = [['todos', 'Todos'], ['borrador', 'Borrador'], ['enviada', 'Enviados'], ['aceptada', 'Aceptados'], ['rechazada', 'Rechazados']];
 
-function Inicio({ presupuestos, catalogo, cuenta, onAbrir, onCatalogo, onNuevo }) {
+function Inicio({ presupuestos, catalogo, cuenta, miEmpresa, onEmpresa, onAbrir, onCatalogo, onNuevo }) {
   const [filtro, setFiltro] = useState('todos');
   const [busca, setBusca] = useState('');
   const total = (estado) => presupuestos.filter((c) => c.estado === estado).reduce((s, c) => s + totalCotizacion(c, catalogo), 0);
@@ -160,6 +165,16 @@ function Inicio({ presupuestos, catalogo, cuenta, onAbrir, onCatalogo, onNuevo }
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-bold" style={{ fontFamily: FONT_SLAB, color: COLORS.ink }}>Catálogo de precios</p>
             <p className="text-[12px]" style={{ color: COLORS.inkSoft }}>{plural(catalogo.insumos.length, 'insumo')} · {plural(catalogo.conceptos.length, 'concepto')} · {plural(catalogo.zonas.length, 'zona')}</p>
+          </div>
+          <ChevronRight size={18} color={COLORS.inkFaint} />
+        </button>
+        <button onClick={onEmpresa} className="w-full rounded-2xl p-4 flex items-center gap-3 text-left" style={{ background: COLORS.paper, boxShadow: CARD_SHADOW, border: miEmpresa?.logo ? 'none' : `1.5px dashed ${COLORS.accent}` }}>
+          {miEmpresa?.logo
+            ? <div className="rounded-xl p-1 flex items-center justify-center shrink-0" style={{ width: 44, height: 44, background: '#fff', border: `1px solid ${COLORS.line}` }}><img src={miEmpresa.logo} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /></div>
+            : <div className="rounded-xl p-2.5" style={{ background: '#E8F7F2' }}><Building2 size={20} color={COLORS.accent} /></div>}
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-bold" style={{ fontFamily: FONT_SLAB, color: COLORS.ink }}>{miEmpresa?.logo ? 'Tu empresa en el PDF' : 'Pon tu logo en el PDF'}</p>
+            <p className="text-[12px] truncate" style={{ color: COLORS.inkSoft }}>{miEmpresa ? [miEmpresa.nombre, miEmpresa.telefono].filter(Boolean).join(' · ') : 'Logo, teléfono y correo en cada presupuesto'}</p>
           </div>
           <ChevronRight size={18} color={COLORS.inkFaint} />
         </button>
@@ -253,7 +268,7 @@ function DatosGenerales({ c, set, bloqueada, extra }) {
 }
 
 // Flujo de estados: borrador → enviada (congela precios) → aceptada / rechazada.
-function BarraEstado({ c, onCambiar, onPDF, onDuplicar, onBorrar, onExcel }) {
+function BarraEstado({ c, onCambiar, onPDF, onDuplicar, onBorrar, onExcel, onWhatsApp }) {
   const e = estadoDe(c.estado);
   const boton = (texto, Icon, onClick, fondo = COLORS.paperAlt, color = COLORS.ink) => (
     <button onClick={onClick} className="py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5" style={{ background: fondo, color }}><Icon size={15} />{texto}</button>
@@ -266,6 +281,7 @@ function BarraEstado({ c, onCambiar, onPDF, onDuplicar, onBorrar, onExcel }) {
         {c.estado === 'enviada' && boton('Rechazada', Ban, () => onCambiar('rechazada'), '#FDECEA', COLORS.bad)}
         {c.estado !== 'borrador' && boton('Volver a borrador', Undo2, () => onCambiar('borrador'))}
         {boton('Ver PDF', Printer, onPDF, COLORS.orange, '#fff')}
+        {onWhatsApp && <BotonWhatsApp onClick={onWhatsApp} />}
         {boton('Excel', Download, onExcel)}
         {boton('Duplicar', Copy, onDuplicar)}
       </div>
@@ -283,7 +299,7 @@ function BorrarConfirmado({ onBorrar, texto = 'Eliminar presupuesto' }) {
 
 /* ============================= PRESUPUESTO ============================= */
 
-function EditorPresupuesto({ cotizacion: c, catalogo, onGuardar, onBack, onPDF, onBorrar, onDuplicar, onIrCatalogo }) {
+function EditorPresupuesto({ cotizacion: c, catalogo, firma, onGuardar, onBack, onPDF, onBorrar, onDuplicar, onIrCatalogo }) {
   const [editando, setEditando] = useState(null);
   const [verExplosion, setVerExplosion] = useState(false);
   const bloqueada = c.estado !== 'borrador';
@@ -315,7 +331,8 @@ function EditorPresupuesto({ cotizacion: c, catalogo, onGuardar, onBack, onPDF, 
           )}
         </div>
 
-        <BarraEstado c={c} onCambiar={cambiarEstado} onPDF={onPDF} onDuplicar={onDuplicar} onBorrar={onBorrar} onExcel={() => descargar(`${c.folio} ${c.nombre || 'presupuesto'}.csv`, csvPresupuesto(c, catalogo), 'text/csv;charset=utf-8')} />
+        <BarraEstado c={c} onCambiar={cambiarEstado} onPDF={onPDF} onDuplicar={onDuplicar} onBorrar={onBorrar} onExcel={() => descargar(`${c.folio} ${c.nombre || 'presupuesto'}.csv`, csvPresupuesto(c, catalogo), 'text/csv;charset=utf-8')}
+          onWhatsApp={() => abrirWhatsApp(`Hola${c.cliente ? ` ${c.cliente}` : ''}, te comparto el presupuesto ${c.folio}${c.nombre ? ` — ${c.nombre}` : ''}.\nTotal: ${pesos(r.total)} con IVA.\nAnticipo: ${cant(c.anticipoPct)}% · Plazo: ${c.plazoSemanas || '—'} semanas.\nVigente hasta el ${fechaLarga(vence(c))}.\nTe envío el PDF con el detalle.${firma ? `\n\n${firma}` : ''}`)} />
         <DatosGenerales c={c} set={set} bloqueada={bloqueada} extra={(
           <Field label="Zona de precios">
             <Select value={c.zonaId} disabled={bloqueada} onChange={(e) => set({ zonaId: e.target.value })}>
@@ -438,7 +455,24 @@ function CatalogoView({ catalogo, onGuardar, onBack }) {
   const [zonaId, setZonaId] = useState(catalogo.zonas[0]?.id || '');
   const [editando, setEditando] = useState(null);
   const [semanal, setSemanal] = useState(false);
+  const [avisoImport, setAvisoImport] = useState(null);
   const set = (cambios) => onGuardar({ ...catalogo, ...cambios });
+  // Excel o CSV con columnas Clave, Descripción, Unidad, Tipo y Precio; el precio entra a la zona seleccionada.
+  const importar = async (ev) => {
+    const archivo = ev.target.files?.[0];
+    ev.target.value = '';
+    if (!archivo) return;
+    try {
+      const XLSX = await import('xlsx');
+      const libro = /\.csv$/i.test(archivo.name) ? XLSX.read(await archivo.text(), { type: 'string' }) : XLSX.read(await archivo.arrayBuffer(), { type: 'array' });
+      const filas = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { defval: '' });
+      const { catalogo: nuevo, resumen } = importarInsumos(catalogo, filas, { zonaId, fecha: hoy(), nuevoId: uid });
+      onGuardar(nuevo);
+      setAvisoImport(`Listo: ${resumen.nuevos} nuevos, ${resumen.actualizados} actualizados, ${resumen.precios} precios en ${zona?.nombre || 'precio general'}${resumen.omitidas ? ` · ${resumen.omitidas} filas sin clave o descripción` : ''}.`);
+    } catch (e) {
+      setAvisoImport('No pude leer ese archivo. Usa la plantilla (Excel o CSV) con columnas Clave, Descripción, Unidad, Tipo y Precio.');
+    }
+  };
   const upsert = (lista, item) => (item.id && lista.some((x) => x.id === item.id) ? lista.map((x) => (x.id === item.id ? item : x)) : [...lista, { ...item, id: item.id || uid() }]);
   const zona = catalogo.zonas.find((z) => z.id === zonaId);
 
@@ -463,6 +497,15 @@ function CatalogoView({ catalogo, onGuardar, onBack }) {
 
         {pestana === 'insumos' && (
           <>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <label className="py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 cursor-pointer" style={{ background: COLORS.paper, color: COLORS.ink, border: `1px solid ${COLORS.line}` }}>
+                <Upload size={15} />Importar Excel<input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importar} />
+              </label>
+              <button onClick={() => descargar('plantilla-insumos.csv', PLANTILLA_INSUMOS, 'text/csv;charset=utf-8')} className="py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5" style={{ background: COLORS.paper, color: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+                <Download size={15} />Plantilla
+              </button>
+            </div>
+            {avisoImport && <Note>{avisoImport}</Note>}
             {catalogo.insumos.length > 0 && (
               <button onClick={() => setSemanal(true)} className="w-full mb-3 py-3 rounded-xl text-[14px] font-bold flex items-center justify-center gap-2" style={{ background: COLORS.orange, color: '#fff' }}>
                 <RefreshCw size={16} />Actualizar precios de la semana · {zona?.nombre || 'General'}
@@ -682,15 +725,18 @@ function ConceptoCatalogoSheet({ concepto, catalogo, zonaId, onClose, onSave, on
 
 /* ============================= PDF ============================= */
 
-function CotizacionPDF({ cotizacion: c, catalogo, cuenta, onBack }) {
+function CotizacionPDF({ cotizacion: c, catalogo, cuenta, marca, onMarca, onBack }) {
   const r = calcularEjecucion(c, catalogo);
   const datos = [['Fecha', fechaLarga(c.fecha)], ['Vigencia', `Hasta ${fechaLarga(vence(c))}`], ['Plazo', c.plazoSemanas ? `${c.plazoSemanas} semanas` : '—'], ['Anticipo', `${cant(c.anticipoPct)}%`]];
   return (
     <div className="pb-28">
       <div className="no-print"><Header title="Vista PDF" subtitle={c.folio} onBack={onBack} /></div>
-      <div className="px-5 no-print mb-4"><PrimaryButton onClick={() => window.print()}><FileText size={17} />Guardar PDF / imprimir</PrimaryButton></div>
+      <div className="px-5 no-print mb-4">
+        {!marca?.logo && <button onClick={onMarca} className="w-full mb-3"><Note>Tu PDF sale sin logo. Toca aquí para poner el logo y los datos de tu empresa.</Note></button>}
+        <PrimaryButton onClick={() => window.print()}><FileText size={17} />Guardar PDF / imprimir</PrimaryButton>
+      </div>
       <div className="mx-3 sm:mx-5 rounded-2xl p-4 sm:p-6" style={{ background: '#fff', boxShadow: CARD_SHADOW }}>
-        <EncabezadoReporte tipo="Presupuesto de obra" titulo={c.nombre || c.folio} proyecto={c} cuenta={cuenta} folio={c.folio} datos={datos} />
+        <EncabezadoReporte tipo="Presupuesto de obra" titulo={c.nombre || c.folio} proyecto={c} cuenta={cuenta} folio={c.folio} datos={datos} marca={marca} />
         <div className="grid grid-cols-3 gap-2 mb-4">
           <KpiReporte label="Subtotal" value={pesos(r.subtotal, 0)} />
           <KpiReporte label={`IVA ${cant(c.ivaPct)}%`} value={pesos(r.iva, 0)} />

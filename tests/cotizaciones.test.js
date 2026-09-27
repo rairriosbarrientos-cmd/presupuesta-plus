@@ -66,3 +66,23 @@ test('explosión de insumos, CSV y folios', () => {
   assert.equal(siguienteFolio(regs), 'P-005');
   assert.equal(siguienteFolio([]), 'P-001');
 });
+
+test('importar insumos desde Excel: agrega, actualiza por clave y registra precio en la zona', async () => {
+  const { importarInsumos } = await import('../src/cotizaciones/calculo.js');
+  let i = 0;
+  const filas = [
+    { Clave: 'cem', 'Descripción': 'Cemento gris CPC 30R', Unidad: 'ton', Tipo: 'Material', Precio: '$3,450.50' },
+    { CLAVE: 'MO-02', DESCRIPCION: 'Oficial albañil', UNIDAD: 'jor', TIPO: 'Mano de obra', PRECIO: 750 },
+    { Clave: '', 'Descripción': 'sin clave' },
+    { Clave: 'EQ-1', 'Descripción': 'Vibrador', Unidad: 'hr', Tipo: 'Equipo', Precio: '' },
+  ];
+  const { catalogo: nuevo, resumen } = importarInsumos(catalogo, filas, { zonaId: 'gro', fecha: '2026-09-28', nuevoId: () => `n${i++}` });
+  assert.deepEqual(resumen, { nuevos: 2, actualizados: 1, precios: 2, omitidas: 1 });
+  const cem = nuevo.insumos.find((x) => x.id === 'cem');
+  assert.equal(cem.descripcion, 'Cemento gris CPC 30R');
+  assert.equal(precioVigente(cem, 'gro').precio, 3450.5);
+  assert.equal(precioVigente(cem, '').precio, 3000); // el general no se toca
+  assert.equal(nuevo.insumos.find((x) => x.clave === 'MO-02').categoria, 'mano_obra');
+  assert.equal(nuevo.insumos.find((x) => x.clave === 'EQ-1').precios.length, 0);
+  assert.equal(catalogo.insumos.find((x) => x.id === 'cem').precios.length, 3); // no muta el original
+});

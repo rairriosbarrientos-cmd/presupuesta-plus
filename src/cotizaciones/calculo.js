@@ -164,3 +164,49 @@ export function csvPresupuesto(cotizacion, catalogo) {
 }
 
 export function redondear(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+// ---------- Importar insumos desde Excel/CSV ----------
+const sinAcentos = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+function columna(fila, nombres) {
+  for (const k of Object.keys(fila)) if (nombres.includes(sinAcentos(k))) return fila[k];
+  return undefined;
+}
+function categoriaDe(t) {
+  const c = sinAcentos(t);
+  if (/mano|^mo$|obra|jornal|cuadrilla/.test(c)) return 'mano_obra';
+  if (/equipo|maquin|herramient/.test(c)) return 'equipo';
+  return 'material';
+}
+const numero = (v) => { const x = parseFloat(String(v ?? '').replace(/[$,\s]/g, '')); return Number.isFinite(x) ? x : null; };
+
+// filas: objetos con encabezados (clave, descripción, unidad, tipo, precio). Actualiza por clave o agrega nuevos;
+// el precio se registra como precio de `fecha` en la zona elegida (o '' = general).
+export function importarInsumos(catalogo, filas, { zonaId = '', fecha, nuevoId }) {
+  const insumos = catalogo.insumos.map((i) => ({ ...i, precios: [...(i.precios || [])] }));
+  const resumen = { nuevos: 0, actualizados: 0, precios: 0, omitidas: 0 };
+  for (const fila of filas) {
+    const clave = String(columna(fila, ['clave', 'codigo', 'id']) ?? '').trim();
+    const descripcion = String(columna(fila, ['descripcion', 'insumo', 'nombre', 'concepto']) ?? '').trim();
+    if (!clave || !descripcion) { resumen.omitidas++; continue; }
+    const unidad = String(columna(fila, ['unidad', 'um', 'u.m.']) ?? '').trim() || 'pza';
+    const tipo = columna(fila, ['tipo', 'categoria', 'clase']);
+    const precio = numero(columna(fila, ['precio', 'precio unitario', 'costo', 'pu', 'importe']));
+    let ins = insumos.find((i) => sinAcentos(i.clave) === sinAcentos(clave));
+    if (ins) {
+      Object.assign(ins, { descripcion, unidad, ...(tipo != null && tipo !== '' ? { categoria: categoriaDe(tipo) } : {}) });
+      resumen.actualizados++;
+    } else {
+      ins = { id: nuevoId(), clave, descripcion, unidad, categoria: categoriaDe(tipo), precios: [] };
+      insumos.push(ins);
+      resumen.nuevos++;
+    }
+    if (precio != null && precio > 0) {
+      ins.precios = ins.precios.filter((p) => !((p.zonaId || '') === zonaId && p.fecha === fecha));
+      ins.precios.push({ id: nuevoId(), zonaId, fecha, precio });
+      resumen.precios++;
+    }
+  }
+  return { catalogo: { ...catalogo, insumos }, resumen };
+}
+
+export const PLANTILLA_INSUMOS = '﻿Clave,Descripción,Unidad,Tipo,Precio\r\nCEM-01,Cemento gris 50 kg,ton,Material,3200\r\nARE-01,Arena,m³,Material,450\r\nMO-01,Peón,jor,Mano de obra,500\r\nEQ-01,Revolvedora 1 saco,hr,Equipo,120\r\n';

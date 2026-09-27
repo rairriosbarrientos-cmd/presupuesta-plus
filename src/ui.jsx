@@ -103,17 +103,21 @@ function Dato({ label, children }) {
     </div>
   );
 }
-export function EncabezadoReporte({ tipo, titulo, proyecto, cuenta, folio, datos = [] }) {
+// marca: datos de la empresa del usuario (logo, teléfono, correo, dirección) para que el PDF salga con su identidad.
+export function EncabezadoReporte({ tipo, titulo, proyecto, cuenta, folio, datos = [], marca }) {
+  const contacto = [marca?.telefono, marca?.correo, marca?.direccion].filter(Boolean).join('  ·  ');
   return (
     <div className="break-inside-avoid mb-5">
       <div className="rounded-2xl overflow-hidden" style={{ background: COLORS.night }}>
         <div className="px-5 pt-4 pb-4 flex items-start justify-between gap-4" style={{ backgroundImage: PLANO_BG, backgroundSize: '14px 14px' }}>
           <div className="min-w-0">
-            <p className="text-[12px] font-bold truncate" style={{ color: COLORS.accent, fontFamily: FONT_SLAB }}>{cuenta?.empresa || APP.nombre}</p>
+            <p className="text-[12px] font-bold truncate" style={{ color: COLORS.accent, fontFamily: FONT_SLAB }}>{marca?.nombre || cuenta?.empresa || APP.nombre}</p>
+            {contacto && <p className="text-[10px] mt-0.5 break-words" style={{ color: COLORS.nightSoft, fontFamily: FONT_MONO }}>{contacto}</p>}
             <p className="text-[10.5px] uppercase tracking-[0.14em] mt-1" style={{ color: COLORS.nightSoft }}>{tipo}</p>
             <h1 className="text-[26px] font-bold leading-[1.05] tracking-tight mt-1" style={{ fontFamily: FONT_SLAB, color: '#fff' }}>{titulo}</h1>
           </div>
-          <div className="text-right shrink-0">
+          <div className="text-right shrink-0 flex flex-col items-end gap-2">
+            {marca?.logo && <div className="rounded-xl p-1.5 flex items-center justify-center" style={{ background: '#fff', width: 76, height: 56 }}><img src={marca.logo} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /></div>}
             {folio && <p className="text-[13px] font-bold" style={{ color: '#fff', fontFamily: FONT_MONO }}>{folio}</p>}
           </div>
         </div>
