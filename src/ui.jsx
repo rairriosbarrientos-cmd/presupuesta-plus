@@ -99,7 +99,7 @@ function Dato({ label, children }) {
   return (
     <div className="min-w-0">
       <p className="text-[9.5px] uppercase tracking-[0.12em] font-semibold" style={{ color: COLORS.inkFaint }}>{label}</p>
-      <p className="text-[12px] font-semibold truncate" style={{ color: COLORS.ink }}>{children || '—'}</p>
+      <p className="text-[12px] font-semibold leading-snug break-words" style={{ color: COLORS.ink }}>{children || '—'}</p>
     </div>
   );
 }
@@ -150,7 +150,7 @@ export function KpiReporte({ label, value, sub, color = COLORS.ink, destacado })
   return (
     <div className="rounded-xl p-3 break-inside-avoid min-w-0" style={{ background: destacado ? COLORS.night : COLORS.paperAlt, border: `1px solid ${destacado ? COLORS.night : COLORS.line}` }}>
       <p className="text-[9.5px] uppercase tracking-[0.12em] font-semibold truncate" style={{ color: destacado ? COLORS.nightSoft : COLORS.inkFaint }}>{label}</p>
-      <p className="text-[19px] font-bold leading-tight mt-0.5 nums truncate" style={{ fontFamily: FONT_SLAB, color: destacado ? '#fff' : color }}>{value}</p>
+      <p className="text-[15px] sm:text-[19px] font-bold leading-tight mt-0.5 nums break-all" style={{ fontFamily: FONT_SLAB, color: destacado ? '#fff' : color }}>{value}</p>
       {sub && <p className="text-[10.5px] mt-0.5" style={{ color: destacado ? COLORS.nightSoft : COLORS.inkSoft }}>{sub}</p>}
     </div>
   );
