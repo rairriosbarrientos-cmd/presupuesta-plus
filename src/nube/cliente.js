@@ -34,6 +34,8 @@ export function traducirError(error) {
   if (/Invalid login credentials/i.test(msg)) return 'Correo o contraseña incorrectos.';
   if (/Email not confirmed/i.test(msg)) return 'Falta confirmar tu correo. Revisa tu bandeja de entrada.';
   if (/already registered|already been registered/i.test(msg)) return 'Ese correo ya tiene cuenta. Entra con tu contraseña.';
+  if (/should be different|different from the old/i.test(msg)) return 'La contraseña nueva debe ser distinta a la anterior.';
+  if (/Auth session missing|expired|otp_expired/i.test(msg)) return 'El enlace ya venció o ya se usó. Pide uno nuevo desde “¿Olvidaste tu contraseña?”.';
   if (/Password should be/i.test(msg)) return 'La contraseña debe tener al menos 6 caracteres.';
   if (/rate limit|too many/i.test(msg)) return 'Demasiados intentos. Espera un minuto y vuelve a intentar.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) return 'Sin conexión. Intenta cuando tengas señal.';

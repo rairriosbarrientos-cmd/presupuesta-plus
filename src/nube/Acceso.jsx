@@ -86,6 +86,12 @@ export function Entrar({ supabase }) {
     e.preventDefault();
     setError(null); setAviso(null); setEnviando(true);
     try {
+      if (modo === 'recuperar') {
+        const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+        if (err) throw err;
+        setAviso('Si ese correo tiene cuenta, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.');
+        return;
+      }
       const datos = { email: email.trim(), password };
       const { data, error: err } = modo === 'entrar'
         ? await supabase.auth.signInWithPassword(datos)
@@ -100,7 +106,7 @@ export function Entrar({ supabase }) {
   }
 
   return (
-    <Marco etiqueta={APP.lema} titulo={modo === 'entrar' ? APP.titulosEntrar[0] : APP.titulosEntrar[1]}
+    <Marco etiqueta={APP.lema} titulo={modo === 'recuperar' ? 'Recupera tu acceso' : modo === 'entrar' ? APP.titulosEntrar[0] : APP.titulosEntrar[1]}
       subtitulo={APP.subtituloEntrar}
       pie={(
         <div className="flex flex-col gap-2.5 px-1">
@@ -119,15 +125,49 @@ export function Entrar({ supabase }) {
         <MensajeError>{error}</MensajeError>
         {aviso && <Aviso>{aviso}</Aviso>}
         <Field label="Correo"><TextInput type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" placeholder={APP.correoPlaceholder} required /></Field>
-        <Field label="Contraseña">
+        {modo !== 'recuperar' && (<Field label="Contraseña">
           <div className="relative">
             <TextInput type={verPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={modo === 'entrar' ? 'current-password' : 'new-password'} minLength={6} placeholder="Mínimo 6 caracteres" required />
             <button type="button" onClick={() => setVerPassword(!verPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2" aria-label={verPassword ? 'Ocultar contraseña' : 'Ver contraseña'}>
               {verPassword ? <EyeOff size={18} color={COLORS.inkFaint} /> : <Eye size={18} color={COLORS.inkFaint} />}
             </button>
           </div>
+        </Field>)}
+        <PrimaryButton type="submit" disabled={enviando || !email || (modo !== 'recuperar' && password.length < 6)}><KeyRound size={17} />{enviando ? 'Un momento...' : modo === 'recuperar' ? 'Enviar enlace' : modo === 'entrar' ? 'Entrar' : 'Crear cuenta'}</PrimaryButton>
+      </form>
+      {modo === 'entrar' && <Enlace type="button" onClick={() => { setModo('recuperar'); setError(null); setAviso(null); }}>¿Olvidaste tu contraseña?</Enlace>}
+      {modo === 'recuperar' && <Enlace type="button" onClick={() => { setModo('entrar'); setError(null); setAviso(null); }}>Volver a entrar</Enlace>}
+    </Marco>
+  );
+}
+
+// Pantalla a la que llega quien abrió el enlace de "¿Olvidaste tu contraseña?".
+export function NuevaContrasena({ supabase, email, onListo }) {
+  const [password, setPassword] = useState('');
+  const [ver, setVer] = useState(false);
+  const [error, setError] = useState(null);
+  const [enviando, setEnviando] = useState(false);
+  async function guardarNueva(e) {
+    e.preventDefault();
+    setError(null); setEnviando(true);
+    const { error: err } = await supabase.auth.updateUser({ password });
+    setEnviando(false);
+    if (err) return setError(traducirError(err));
+    onListo();
+  }
+  return (
+    <Marco etiqueta={email} titulo="Nueva contraseña" subtitulo="Escribe la contraseña que vas a usar desde ahora.">
+      <form onSubmit={guardarNueva}>
+        <MensajeError>{error}</MensajeError>
+        <Field label="Contraseña nueva">
+          <div className="relative">
+            <TextInput type={ver ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={6} placeholder="Mínimo 6 caracteres" required />
+            <button type="button" onClick={() => setVer(!ver)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2" aria-label={ver ? 'Ocultar contraseña' : 'Ver contraseña'}>
+              {ver ? <EyeOff size={18} color={COLORS.inkFaint} /> : <Eye size={18} color={COLORS.inkFaint} />}
+            </button>
+          </div>
         </Field>
-        <PrimaryButton type="submit" disabled={enviando || !email || password.length < 6}><KeyRound size={17} />{enviando ? 'Un momento...' : modo === 'entrar' ? 'Entrar' : 'Crear cuenta'}</PrimaryButton>
+        <PrimaryButton type="submit" disabled={enviando || password.length < 6}><KeyRound size={17} />{enviando ? 'Guardando...' : 'Guardar y entrar'}</PrimaryButton>
       </form>
     </Marco>
   );

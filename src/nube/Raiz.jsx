@@ -3,7 +3,7 @@ import App from '../App.jsx';
 import { APP, rpcDe, tablaDe } from '../config.js';
 import { leerConfig, obtenerCliente, traducirError } from './cliente.js';
 import { crearSincronizador } from './sincronizador.js';
-import { Cargando, Entrar, ElegirEmpresa, CuentaSheet, EsperandoAprobacion, LicenciaBloqueada } from './Acceso.jsx';
+import { Cargando, Entrar, ElegirEmpresa, CuentaSheet, EsperandoAprobacion, LicenciaBloqueada, NuevaContrasena } from './Acceso.jsx';
 import { PanelPlataforma } from './Plataforma.jsx';
 
 const membresiasKey = (uid) => `${APP.claveLocal}-membresias:${uid}`;
@@ -20,16 +20,19 @@ export default function Raiz() {
 function ConNube({ config }) {
   const supabase = useMemo(() => obtenerCliente(config), [config.url, config.anonKey]);
   const [sesion, setSesion] = useState(undefined);
+  // Llegó desde el correo de "¿Olvidaste tu contraseña?": primero pide la contraseña nueva.
+  const [recuperando, setRecuperando] = useState(false);
 
   useEffect(() => {
     let vivo = true;
     supabase.auth.getSession().then(({ data }) => { if (vivo) setSesion(data.session ?? null); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_evento, s) => setSesion(s ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((evento, s) => { if (evento === 'PASSWORD_RECOVERY') setRecuperando(true); setSesion(s ?? null); });
     return () => { vivo = false; sub.subscription.unsubscribe(); };
   }, [supabase]);
 
   if (sesion === undefined) return <Cargando />;
   if (!sesion) return <Entrar supabase={supabase} />;
+  if (recuperando) return <NuevaContrasena supabase={supabase} email={sesion.user.email} onListo={() => setRecuperando(false)} />;
   return <ConSesion key={sesion.user.id} supabase={supabase} usuario={sesion.user} />;
 }
 
